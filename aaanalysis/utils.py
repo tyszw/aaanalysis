@@ -157,6 +157,8 @@ COL_SEQ = "sequence"
 COL_JMD_N = "jmd_n"
 COL_TMD = "tmd"
 COL_JMD_C = "jmd_c"
+COL_JMD_N_LEN = "jmd_n_len"
+COL_JMD_C_LEN = "jmd_c_len"
 COL_TMD_START = "tmd_start"
 COL_TMD_STOP = "tmd_stop"
 COLS_SEQ_INFO = [COL_ENTRY, COL_SEQ, COL_LABEL]
@@ -585,7 +587,11 @@ def check_df_parts(df_parts=None, accept_none=False):
         raise ValueError("Index in 'df_parts' must be unique. Drop duplicates!")
     # Check if columns contain strings
     dict_dtype = dict(df_parts.dtypes)
-    cols_wrong_type = [col for col in dict_dtype if dict_dtype[col] not in [object, str]]
+    cols_wrong_type = []
+    for col, dtype in dict_dtype.items():
+        is_string_dtype = getattr(dtype, "kind", None) in ["O", "U", "S"] or str(dtype).startswith("string")
+        if not is_string_dtype:
+            cols_wrong_type.append(col)
     if len(cols_wrong_type) > 0:
         error = "'df_parts' should contain sequences with type string." \
                 f"\n  Following columns contain no values with type string: {cols_wrong_type}"

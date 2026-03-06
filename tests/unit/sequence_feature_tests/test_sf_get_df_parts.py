@@ -62,6 +62,67 @@ class TestGetDfParts:
         seq_based_true = (df_seq["sequence"] == seq).all()
         assert seq_based_true
 
+
+
+    def test_partial_part_based_format_tmd_only(self):
+        sf = aa.SequenceFeature()
+        df_seq = aa.load_dataset(name="DOM_GSEC", n=5)
+        df_in = df_seq[["entry", "tmd"]].copy()
+        df_parts = sf.get_df_parts(df_seq=df_in, list_parts=["jmd_n", "tmd", "jmd_c"],
+                                   jmd_n_len=None, jmd_c_len=None)
+        assert (df_parts["tmd"].to_numpy() == df_seq["tmd"].to_numpy()).all()
+        assert (df_parts["jmd_n"].str.len() == 0).all()
+        assert (df_parts["jmd_c"].str.len() == 0).all()
+
+    def test_partial_part_based_format_jmd_n_tmd(self):
+        sf = aa.SequenceFeature()
+        df_seq = aa.load_dataset(name="DOM_GSEC", n=5)
+        df_in = df_seq[["entry", "jmd_n", "tmd"]].copy()
+        df_parts = sf.get_df_parts(df_seq=df_in, list_parts=["jmd_n", "tmd", "jmd_c"],
+                                   jmd_n_len=None, jmd_c_len=None)
+        assert (df_parts["jmd_n"].to_numpy() == df_seq["jmd_n"].to_numpy()).all()
+        assert (df_parts["tmd"].to_numpy() == df_seq["tmd"].to_numpy()).all()
+        assert (df_parts["jmd_c"].str.len() == 0).all()
+
+    def test_partial_part_based_format_tmd_jmd_c(self):
+        sf = aa.SequenceFeature()
+        df_seq = aa.load_dataset(name="DOM_GSEC", n=5)
+        df_in = df_seq[["entry", "tmd", "jmd_c"]].copy()
+        df_parts = sf.get_df_parts(df_seq=df_in, list_parts=["jmd_n", "tmd", "jmd_c"],
+                                   jmd_n_len=None, jmd_c_len=None)
+        assert (df_parts["tmd"].to_numpy() == df_seq["tmd"].to_numpy()).all()
+        assert (df_parts["jmd_c"].to_numpy() == df_seq["jmd_c"].to_numpy()).all()
+        assert (df_parts["jmd_n"].str.len() == 0).all()
+
+    def test_pos_based_format_with_variable_jmd_len_columns(self):
+        sf = aa.SequenceFeature()
+        df_seq = aa.load_dataset(name="DOM_GSEC", n=5)
+        cols = ["entry", "sequence", "tmd_start", "tmd_stop"]
+        df_var = df_seq[cols].copy()
+        n = len(df_var)
+        df_var["jmd_n_len"] = [2 + (i % 5) for i in range(n)]
+        df_var["jmd_c_len"] = [1 + (i % 5) for i in range(n)]
+
+        df_parts = sf.get_df_parts(df_seq=df_var, list_parts=["jmd_n", "tmd", "jmd_c"],
+                                   jmd_n_len=None, jmd_c_len=None)
+
+        assert (df_parts["jmd_n"].str.len().to_numpy() == df_var["jmd_n_len"].to_numpy()).all()
+        assert (df_parts["jmd_c"].str.len().to_numpy() == df_var["jmd_c_len"].to_numpy()).all()
+
+    def test_seq_based_format_with_variable_jmd_len_columns(self):
+        sf = aa.SequenceFeature()
+        df_seq = aa.load_dataset(name="DOM_GSEC", n=5)
+        df_var = df_seq[["entry", "sequence"]].copy()
+        n = len(df_var)
+        df_var["jmd_n_len"] = [2 + (i % 5) for i in range(n)]
+        df_var["jmd_c_len"] = [1 + (i % 5) for i in range(n)]
+
+        df_parts = sf.get_df_parts(df_seq=df_var, list_parts=["jmd_n", "tmd", "jmd_c"],
+                                   jmd_n_len=None, jmd_c_len=None)
+
+        assert (df_parts["jmd_n"].str.len().to_numpy() == df_var["jmd_n_len"].to_numpy()).all()
+        assert (df_parts["jmd_c"].str.len().to_numpy() == df_var["jmd_c_len"].to_numpy()).all()
+
     def test_valid_df_seq(self):
         """Test a valid 'df_seq' parameter."""
         sf = aa.SequenceFeature()
