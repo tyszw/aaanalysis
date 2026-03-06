@@ -119,9 +119,21 @@ def _get_df_pos_long(df=None, col_cat="category", col_val=None):
 # Get df parts
 def _extract_parts(row, jmd_n_len, jmd_c_len, pos_based, list_parts):
     """Helper function to extract parts from a single row."""
-    if jmd_c_len is not None and jmd_n_len is not None and pos_based:
+    if pos_based:
         seq, tmd_start, tmd_stop = row[ut.COLS_SEQ_POS]
-        jmd_n, tmd, jmd_c = create_parts(seq, tmd_start, tmd_stop, jmd_n_len, jmd_c_len)
+        jmd_n_len_row = jmd_n_len
+        jmd_c_len_row = jmd_c_len
+        if jmd_n_len_row is None:
+            if ut.COL_JMD_N_LEN in row:
+                jmd_n_len_row = row[ut.COL_JMD_N_LEN]
+            else:
+                jmd_n_len_row = tmd_start - 1
+        if jmd_c_len_row is None:
+            if ut.COL_JMD_C_LEN in row:
+                jmd_c_len_row = row[ut.COL_JMD_C_LEN]
+            else:
+                jmd_c_len_row = len(seq) - tmd_stop
+        jmd_n, tmd, jmd_c = create_parts(seq, tmd_start, tmd_stop, jmd_n_len_row, jmd_c_len_row)
     else:
         jmd_n, tmd, jmd_c = row[ut.COLS_SEQ_PARTS]
     # Get dictionary of parts and filter by list_parts

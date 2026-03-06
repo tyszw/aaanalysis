@@ -216,6 +216,8 @@ class SequenceFeature:
         * If ``ext_len`` in aaanalysis.options is not set to > 0, following parts containing extended tmd are not
           considered for ``all_parts=True``: ['tmd_e', 'ext_c', 'ext_n', 'ext_n_tmd_n', 'tmd_c_ext_c'].
         * ``jmd_n_len`` and ``jmd_c_len`` must be both given, except for the part-based format.
+          As alternative for variable-length handling, per-sample columns ``jmd_n_len`` and ``jmd_c_len``
+          can be provided in ``df_seq``.
 
         Formats for ``df_seq`` are differentiated by their respective columns:
 
@@ -234,6 +236,7 @@ class SequenceFeature:
 
         **Sequence-based format**
             - Only the 'sequence' column.
+            - Optional: per-sample 'jmd_n_len' and 'jmd_c_len' columns for variable-length splitting.
 
         Examples
         --------
@@ -242,7 +245,34 @@ class SequenceFeature:
         # Check input
         jmd_n_len = ut.check_jmd_n_len(jmd_n_len=jmd_n_len)
         jmd_c_len = ut.check_jmd_c_len(jmd_c_len=jmd_c_len)
-        check_parts_len(jmd_n_len=jmd_n_len, jmd_c_len=jmd_c_len, accept_none_tmd_len=True)
+
+        # Normalize partial part-based format for this interface.
+        # Accepted partial combinations are:
+        #   - ['entry', 'tmd']
+        #   - ['entry', 'jmd_n', 'tmd']
+        #   - ['entry', 'tmd', 'jmd_c']
+        # Missing JMD part(s) are interpreted as empty strings.
+        if isinstance(df_seq, pd.DataFrame):
+            cols = set(df_seq)
+            has_entry = ut.COL_ENTRY in cols
+            has_seq = ut.COL_SEQ in cols
+            has_tmd = ut.COL_TMD in cols
+            has_jmd_n = ut.COL_JMD_N in cols
+            has_jmd_c = ut.COL_JMD_C in cols
+            has_partial_parts = has_entry and has_tmd and not has_seq and not (has_jmd_n and has_jmd_c)
+            if has_partial_parts:
+                df_seq = df_seq.copy()
+                if not has_jmd_n:
+                    df_seq[ut.COL_JMD_N] = ""
+                if not has_jmd_c:
+                    df_seq[ut.COL_JMD_C] = ""
+
+        has_rowwise_jmd_len = isinstance(df_seq, pd.DataFrame) and set([ut.COL_JMD_N_LEN, ut.COL_JMD_C_LEN]).issubset(set(df_seq))
+        has_part_based_cols = isinstance(df_seq, pd.DataFrame) and set(ut.COLS_SEQ_PARTS).issubset(set(df_seq))
+        check_parts_len(jmd_n_len=jmd_n_len,
+                        jmd_c_len=jmd_c_len,
+                        accept_none_tmd_len=True,
+                        accept_none_jmd_len=(has_rowwise_jmd_len or has_part_based_cols))
         ut.check_df_seq(df_seq=df_seq)
         ut.check_bool(name="all_parts", val=all_parts)
         ut.check_bool(name="replace_non_canonical_aa", val=replace_non_canonical_aa)

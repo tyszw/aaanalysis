@@ -221,46 +221,61 @@ def check_match_df_seq_jmd_len(df_seq=None, jmd_n_len=None, jmd_c_len=None):
     part_based = set(ut.COLS_SEQ_PARTS).issubset(set(df_seq))
     seq_based = ut.COL_SEQ in list(df_seq)
     seq_tmd_based = set(ut.COLS_SEQ_TMD).issubset(set(df_seq))
+    jmd_len_col_based = set([ut.COL_JMD_N_LEN, ut.COL_JMD_C_LEN]).issubset(set(df_seq))
+
+    # Validate row-wise JMD length columns if provided.
+    if jmd_len_col_based:
+        for col in [ut.COL_JMD_N_LEN, ut.COL_JMD_C_LEN]:
+            for entry, val in zip(df_seq[ut.COL_ENTRY], df_seq[col]):
+                ut.check_number_range(name=f"'{col}'={val} (entry: '{entry}')", val=val, min_val=0, just_int=True)
+
     # 'jmd_n_len' and 'jmd_c_len' should be already checked if None or int by interface
     if [jmd_n_len, jmd_c_len].count(None) >= 1:
-        if not part_based:
+        if [jmd_n_len, jmd_c_len].count(None) == 1:
+            raise ValueError("'jmd_n_len' and 'jmd_c_len' should be both given or both None.")
+        # both None
+        if not (part_based or jmd_len_col_based):
             raise ValueError(f"'jmd_n_len' and 'jmd_c_len' should be both given if '{ut.COLS_SEQ_PARTS}' are not provided")
-        else:
-            if [jmd_n_len, jmd_c_len].count(None) == 1:
-                raise ValueError(f"'jmd_n_len' and 'jmd_c_len' should be both given or both None "
-                                 f"if '{ut.COLS_SEQ_PARTS}' are provided")
     # Get 'tmd_start' and 'tmd_stop'
-    elif [jmd_n_len, jmd_c_len].count(None) == 0:
-        if part_based and not pos_based:
-            df_seq[ut.COL_SEQ] = df_seq[ut.COL_JMD_N] + df_seq[ut.COL_TMD] + df_seq[ut.COL_JMD_C]
-            df_seq[[ut.COL_TMD_START, ut.COL_TMD_STOP]] = df_seq.apply(_get_tmd_positions, axis=1)
+    elif part_based and not pos_based:
+        df_seq[ut.COL_SEQ] = df_seq[ut.COL_JMD_N] + df_seq[ut.COL_TMD] + df_seq[ut.COL_JMD_C]
+        df_seq[[ut.COL_TMD_START, ut.COL_TMD_STOP]] = df_seq.apply(_get_tmd_positions, axis=1)
+
     if not pos_based and not part_based:
         if seq_tmd_based:
             df_seq[[ut.COL_TMD_START, ut.COL_TMD_STOP]] = df_seq.apply(_get_tmd_positions, axis=1)
         elif seq_based:
-            tmd_start = 1 + jmd_n_len
             list_seq = []
+            list_tmd_start = []
             list_tmd_stop = []
-            for seq in df_seq[ut.COL_SEQ]:
-                # If 'jmd_n_len' and 'jmd_c_len' exceed the sequence length, sequence is adjusted using gaps.
-                dif_jmd_n_len_seq = jmd_n_len - len(seq)
+            if jmd_len_col_based:
+                list_jmd_n_len = df_seq[ut.COL_JMD_N_LEN].to_list()
+                list_jmd_c_len = df_seq[ut.COL_JMD_C_LEN].to_list()
+            else:
+                list_jmd_n_len = [jmd_n_len] * len(df_seq)
+                list_jmd_c_len = [jmd_c_len] * len(df_seq)
+            for seq, jmd_n_len_row, jmd_c_len_row in zip(df_seq[ut.COL_SEQ], list_jmd_n_len, list_jmd_c_len):
+                tmd_start = 1 + jmd_n_len_row
+                # If JMD lengths exceed sequence length, sequence is adjusted using gaps.
+                dif_jmd_n_len_seq = jmd_n_len_row - len(seq)
                 if dif_jmd_n_len_seq >= 0:
                     # Add one gap for TMD
                     seq += ut.STR_AA_GAP * (dif_jmd_n_len_seq + 1)
-                dif_jmd_len_seq = jmd_c_len + jmd_n_len - len(seq)
+                dif_jmd_len_seq = jmd_c_len_row + jmd_n_len_row - len(seq)
                 if dif_jmd_len_seq >= 0:
                     # If no jmd_n, add gaps to N-terminus of sequence
-                    if jmd_n_len == 0:
+                    if jmd_n_len_row == 0:
                         seq = ut.STR_AA_GAP * (dif_jmd_len_seq + 1) + seq
                     # If jmd_n, add gaps to C-terminus of sequence
                     else:
                         seq += ut.STR_AA_GAP * (dif_jmd_len_seq + 1)
                     tmd_stop = tmd_start
                 else:
-                    tmd_stop = len(seq) - jmd_c_len
+                    tmd_stop = len(seq) - jmd_c_len_row
                 list_seq.append(seq)
+                list_tmd_start.append(tmd_start)
                 list_tmd_stop.append(tmd_stop)
-            df_seq[ut.COL_TMD_START] = tmd_start
+            df_seq[ut.COL_TMD_START] = list_tmd_start
             df_seq[ut.COL_TMD_STOP] = list_tmd_stop
             df_seq[ut.COL_SEQ] = list_seq
     return df_seq
